@@ -88,10 +88,11 @@ document.getElementById('test-api-key').addEventListener('click', function() {
 
 	fetch(url.toString(), {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({
+		headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+		body: JSON.stringify({
 			api_key: apiKey,
-			_csrf: '<?= htmlspecialchars($csrfToken) ?>'
+			ajax: true,
+			_csrf: context.csrf
 		})
 	})
 	.then(function(r) { return r.json(); })

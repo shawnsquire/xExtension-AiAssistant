@@ -12,9 +12,14 @@
 		return url.toString();
 	}
 
-	function getCsrfToken() {
-		var meta = document.getElementById("ai-assistant-meta");
-		return meta ? meta.dataset.token : "";
+	function ajaxPost(action, params) {
+		params._csrf = context.csrf;
+		params.ajax = true;
+		return fetch(getAjaxUrl(action), {
+			method: "POST",
+			headers: { "Content-Type": "application/json; charset=UTF-8" },
+			body: JSON.stringify(params),
+		}).then(function (r) { return r.json(); });
 	}
 
 	// ── Batch scoring ────────────────────────────────────────────────────────
@@ -35,15 +40,7 @@
 			el.innerHTML = '<span class="ai-scoring-spinner">Scoring\u2026</span>';
 		});
 
-		fetch(getAjaxUrl("score_batch"), {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: new URLSearchParams({
-				entry_ids: JSON.stringify(ids),
-				_csrf: getCsrfToken(),
-			}),
-		})
-			.then(function (r) { return r.json(); })
+		ajaxPost("score_batch", { entry_ids: ids })
 			.then(function (data) {
 				if (data.status !== "ok" || !data.scores) {
 					console.error("AI scoring failed:", data.message);
@@ -107,15 +104,7 @@
 		btn.disabled = true;
 		btn.textContent = "Summarizing\u2026";
 
-		fetch(getAjaxUrl("summarize"), {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: new URLSearchParams({
-				entry_id: entryId,
-				_csrf: getCsrfToken(),
-			}),
-		})
-			.then(function (r) { return r.json(); })
+		ajaxPost("summarize", { entry_id: entryId })
 			.then(function (data) {
 				if (data.status === "ok" && data.summary) {
 					var span = document.createElement("span");
@@ -149,17 +138,7 @@
 
 		btn.disabled = true;
 
-		fetch(getAjaxUrl("feedback"), {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: new URLSearchParams({
-				entry_id: entryId,
-				direction: direction,
-				reason: reason,
-				_csrf: getCsrfToken(),
-			}),
-		})
-			.then(function (r) { return r.json(); })
+		ajaxPost("feedback", { entry_id: entryId, direction: direction, reason: reason })
 			.then(function (data) {
 				if (data.status === "ok") {
 					btn.textContent = "\u2713";

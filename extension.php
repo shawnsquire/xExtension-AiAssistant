@@ -2,7 +2,14 @@
 
 class AiAssistantExtension extends Minz_Extension {
 
-	private static bool $metaInjected = false;
+	private static ?array $jsonInput = null;
+
+	private static function jsonParam(string $key): mixed {
+		if (self::$jsonInput === null) {
+			self::$jsonInput = json_decode(file_get_contents('php://input'), true) ?: [];
+		}
+		return self::$jsonInput[$key] ?? '';
+	}
 
 	// ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -24,20 +31,11 @@ class AiAssistantExtension extends Minz_Extension {
 		$attrs = $entry->attributes();
 		$entryId = $entry->id();
 
-		// Inject CSRF meta once (must happen before any early return)
-		$meta = '';
-		if (!self::$metaInjected) {
-			self::$metaInjected = true;
-			$token = FreshRSS_Auth::csrfToken();
-			$meta = '<div id="ai-assistant-meta" data-token="'
-				. htmlspecialchars($token) . '" style="display:none"></div>';
-		}
-
 		// Unscored: emit placeholder for JS batch scoring
 		if (!isset($attrs['ai_score'])) {
 			$placeholder = '<div class="ai-assistant-container ai-score-pending"'
 				. ' data-entry-id="' . htmlspecialchars($entryId) . '"></div>';
-			$entry->_content($meta . $placeholder . $entry->content());
+			$entry->_content($placeholder . $entry->content());
 			return $entry;
 		}
 
@@ -55,8 +53,7 @@ class AiAssistantExtension extends Minz_Extension {
 		}
 
 		// Build badge
-		$html = $meta
-			. '<div class="ai-assistant-container" data-entry-id="' . htmlspecialchars($entryId) . '">'
+		$html = '<div class="ai-assistant-container" data-entry-id="' . htmlspecialchars($entryId) . '">'
 			. '<span class="ai-score-badge ' . $colorClass . '" title="' . $reason . '">'
 			. $score . '</span>';
 
@@ -128,7 +125,7 @@ class AiAssistantExtension extends Minz_Extension {
 	}
 
 	private function ajaxScoreBatch(): void {
-		$entryIds = json_decode(Minz_Request::paramString('entry_ids'), true);
+		$entryIds = self::jsonParam('entry_ids');
 		if (!is_array($entryIds) || empty($entryIds)) {
 			echo json_encode(['status' => 'error', 'message' => 'No entry IDs']);
 			return;
@@ -257,7 +254,7 @@ class AiAssistantExtension extends Minz_Extension {
 	}
 
 	private function ajaxSummarize(): void {
-		$entryId = Minz_Request::paramString('entry_id');
+		$entryId = self::jsonParam('entry_id');
 		if (!$entryId) {
 			echo json_encode(['status' => 'error', 'message' => 'No entry ID']);
 			return;
@@ -299,9 +296,9 @@ class AiAssistantExtension extends Minz_Extension {
 	}
 
 	private function ajaxFeedback(): void {
-		$entryId = Minz_Request::paramString('entry_id');
-		$direction = Minz_Request::paramString('direction');
-		$reason = Minz_Request::paramString('reason');
+		$entryId = self::jsonParam('entry_id');
+		$direction = self::jsonParam('direction');
+		$reason = self::jsonParam('reason');
 
 		if (!$entryId || !$direction) {
 			echo json_encode(['status' => 'error', 'message' => 'Missing parameters']);
@@ -353,7 +350,7 @@ class AiAssistantExtension extends Minz_Extension {
 	}
 
 	private function ajaxTestApiKey(): void {
-		$apiKey = Minz_Request::paramString('api_key');
+		$apiKey = self::jsonParam('api_key');
 		if (!$apiKey) {
 			$apiKey = $this->getUserConfigurationValue('api_key');
 		}
@@ -372,7 +369,7 @@ class AiAssistantExtension extends Minz_Extension {
 	}
 
 	private function ajaxGetScoredEntries(): void {
-		$sinceHours = intval(Minz_Request::paramString('since') ?: 24);
+		$sinceHours = intval(self::jsonParam('since') ?: 24);
 		$since = time() - ($sinceHours * 3600);
 
 		$entryDAO = FreshRSS_Factory::createEntryDao();
