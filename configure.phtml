@@ -2,7 +2,7 @@
 /** @var AiAssistantExtension $this */
 $apiKey = $this->getUserConfigurationValue('api_key') ?? '';
 $profile = $this->getUserConfigurationValue('interest_profile') ?? '';
-$threshold = $this->getUserConfigurationValue('summary_threshold') ?: '7';
+$threshold = $this->getUserConfigurationValue('summary_threshold') ?: '5';
 $scoringModel = $this->getUserConfigurationValue('scoring_model') ?: 'claude-haiku-4-5-20251001';
 $summaryModel = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
 $formAction = _url('extension', 'configure', 'e', $this->getName());
@@ -53,6 +53,39 @@ $csrfToken = FreshRSS_Auth::csrfToken();
 					<option value="claude-sonnet-4-6-20250725" <?= $summaryModel === 'claude-sonnet-4-6-20250725' ? 'selected' : '' ?>>Claude Sonnet 4.6</option>
 					<option value="claude-haiku-4-5-20251001" <?= $summaryModel === 'claude-haiku-4-5-20251001' ? 'selected' : '' ?>>Claude Haiku 4.5</option>
 				</select>
+			</div>
+
+			<div class="form-group">
+				<label>Always Summarize</label>
+				<p class="help-block">
+					Articles from checked feeds/categories will always be summarized, regardless of score.
+				</p>
+				<?php foreach ($this->categories as $c) { ?>
+					<table class="table table-condensed" style="margin-bottom: 4px;">
+						<tr>
+							<td style="width: 30px;">
+								<input type="checkbox"
+									id="sum_cat_<?= $c->id() ?>"
+									name="sum_cat_<?= $c->id() ?>"
+									value="1"
+									<?= $this->getSummarizeCategory($c->id()) ? 'checked' : '' ?>>
+							</td>
+							<td><strong><label for="sum_cat_<?= $c->id() ?>"><?= htmlspecialchars($c->name()) ?> (whole category)</label></strong></td>
+						</tr>
+						<?php foreach ($c->feeds() as $f) { ?>
+							<tr>
+								<td style="width: 30px; padding-left: 20px;">
+									<input type="checkbox"
+										id="sum_feed_<?= $f->id() ?>"
+										name="sum_feed_<?= $f->id() ?>"
+										value="1"
+										<?= $this->getSummarizeFeed($f->id()) ? 'checked' : '' ?>>
+								</td>
+								<td><label for="sum_feed_<?= $f->id() ?>"><?= htmlspecialchars($f->name()) ?></label></td>
+							</tr>
+						<?php } ?>
+					</table>
+				<?php } ?>
 			</div>
 
 			<div class="form-group">

@@ -42,7 +42,8 @@ class AiAssistantExtension extends Minz_Extension {
 		$score = intval($attrs['ai_score']);
 		$reason = htmlspecialchars($attrs['ai_score_reason'] ?? '', ENT_QUOTES);
 		$summary = $attrs['ai_summary'] ?? '';
-		$threshold = intval($this->getUserConfigurationValue('summary_threshold') ?: 7);
+		$detail = $attrs['ai_detail'] ?? '';
+		$threshold = intval($this->getUserConfigurationValue('summary_threshold') ?: 5);
 
 		if ($score >= 7) {
 			$colorClass = 'ai-score-high';
@@ -60,6 +61,13 @@ class AiAssistantExtension extends Minz_Extension {
 		// Summary or summarize button
 		if ($summary) {
 			$html .= '<span class="ai-summary">' . htmlspecialchars($summary) . '</span>';
+			// "More detail" button or cached detail
+			if ($detail) {
+				$html .= '<button class="ai-detail-toggle">More detail</button>'
+					. '<div class="ai-detail" style="display:none;">' . $this->formatDetail($detail) . '</div>';
+			} else {
+				$html .= '<button class="ai-detail-btn">More detail</button>';
+			}
 		} elseif ($score < $threshold) {
 			$html .= '<button class="ai-summarize-btn">Summarize</button>';
 		}
@@ -82,6 +90,14 @@ class AiAssistantExtension extends Minz_Extension {
 			return;
 		}
 
+		// Load categories/feeds for the config template
+		$catDAO = FreshRSS_Factory::createCategoryDao();
+		$this->categories = $catDAO->listCategories(true, false) ?: [];
+
+		// Load current always-summarize config
+		$this->summarizeFeeds = $this->loadAttribute('ext_ai_assistant_summarize_feeds');
+		$this->summarizeCategories = $this->loadAttribute('ext_ai_assistant_summarize_categories');
+
 		// Normal POST: save settings
 		if (Minz_Request::isPost()) {
 			$config = $this->getUserConfiguration() ?: [];
@@ -91,7 +107,59 @@ class AiAssistantExtension extends Minz_Extension {
 			$config['scoring_model'] = Minz_Request::paramString('scoring_model');
 			$config['summary_model'] = Minz_Request::paramString('summary_model');
 			$this->setUserConfiguration($config);
+
+			// Save per-feed/category always-summarize checkboxes
+			$feedConfig = [];
+			$catConfig = [];
+			foreach ($this->categories as $c) {
+				if (Minz_Request::paramBoolean('sum_cat_' . $c->id())) {
+					$catConfig[$c->id()] = true;
+				}
+				foreach ($c->feeds() as $f) {
+					if (Minz_Request::paramBoolean('sum_feed_' . $f->id())) {
+						$feedConfig[$f->id()] = true;
+					}
+				}
+			}
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_feeds', json_encode($feedConfig));
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_categories', json_encode($catConfig));
+			FreshRSS_Context::userConf()->save();
+
+			// Reload for display
+			$this->summarizeFeeds = $feedConfig;
+			$this->summarizeCategories = $catConfig;
 		}
+	}
+
+	/** @var FreshRSS_Category[] */
+	public array $categories = [];
+	public array $summarizeFeeds = [];
+	public array $summarizeCategories = [];
+
+	public function getSummarizeFeed(int $id): bool {
+		return isset($this->summarizeFeeds[$id]);
+	}
+
+	public function getSummarizeCategory(int $id): bool {
+		return isset($this->summarizeCategories[$id]);
+	}
+
+	private function loadAttribute(string $key): array {
+		$value = FreshRSS_Context::userConf()->attributeString($key);
+		if ($value === '') return [];
+		$decoded = json_decode($value, true);
+		return is_array($decoded) ? $decoded : [];
+	}
+
+	private function isAlwaysSummarize(FreshRSS_Entry $entry): bool {
+		$feedId = $entry->feedId();
+		$feed = $entry->feed(false);
+		$catId = $feed ? ($feed->category() ? $feed->category()->id() : null) : null;
+
+		$feedConfig = $this->loadAttribute('ext_ai_assistant_summarize_feeds');
+		$catConfig = $this->loadAttribute('ext_ai_assistant_summarize_categories');
+
+		return isset($feedConfig[$feedId]) || ($catId !== null && isset($catConfig[$catId]));
 	}
 
 	// ── AJAX handlers ────────────────────────────────────────────────────────
@@ -105,6 +173,9 @@ class AiAssistantExtension extends Minz_Extension {
 				break;
 			case 'summarize':
 				$this->ajaxSummarize();
+				break;
+			case 'detail':
+				$this->ajaxDetail();
 				break;
 			case 'feedback':
 				$this->ajaxFeedback();
@@ -186,9 +257,9 @@ class AiAssistantExtension extends Minz_Extension {
 
 		// Write scores to entry attributes
 		$results = [];
-		$threshold = intval($this->getUserConfigurationValue('summary_threshold') ?: 7);
+		$threshold = intval($this->getUserConfigurationValue('summary_threshold') ?: 5);
 		$summaryModel = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
-		$highScoreEntries = [];
+		$summaryEntries = [];
 
 		foreach ($scores as $s) {
 			$id = $s['id'] ?? null;
@@ -210,41 +281,53 @@ class AiAssistantExtension extends Minz_Extension {
 				'reason' => $reason,
 			];
 
-			if ($score >= $threshold) {
-				$highScoreEntries[] = ['id' => $id, 'entry' => $entry, 'score' => $score];
+			// Auto-summarize if score >= threshold OR always-summarize feed/category
+			if ($score >= $threshold || $this->isAlwaysSummarize($entry)) {
+				$summaryEntries[] = ['id' => $id, 'entry' => $entry, 'score' => $score];
 			}
 		}
 
-		// Auto-summarize high-score articles
-		if (!empty($highScoreEntries)) {
-			$this->autoSummarize($apiKey, $summaryModel, $highScoreEntries, $entryDAO, $results);
+		// Auto-summarize qualifying articles
+		if (!empty($summaryEntries)) {
+			$this->autoSummarize($apiKey, $summaryModel, $summaryEntries, $entryDAO, $results);
 		}
 
 		echo json_encode(['status' => 'ok', 'scores' => $results]);
 	}
 
+	// ── Summary generation (shared) ─────────────────────────────────────────
+
+	private function generateSummary(string $apiKey, string $model, FreshRSS_Entry $entry): ?string {
+		$profile = $this->getUserConfigurationValue('interest_profile');
+		$content = mb_substr(strip_tags($entry->content()), 0, 3000);
+		$title = $entry->title();
+		$source = $entry->feed(false) ? $entry->feed(false)->name() : 'Unknown';
+
+		$prompt = "You are a research assistant for a reader with these interests:\n\n"
+			. "<interest_profile>\n{$profile}\n</interest_profile>\n\n"
+			. "Summarize this article — what it says and why it matters to this reader.\n"
+			. "Be direct. 1-3 sentences. If it's tangential to their interests, say so.\n\n"
+			. "Title: {$title}\nSource: {$source}\n\nContent:\n{$content}\n\n"
+			. "Return ONLY the summary, no quotes, no prefix.";
+
+		$summary = $this->callClaude($apiKey, $model, $prompt, 300);
+		return $summary ? trim($summary) : null;
+	}
+
 	private function autoSummarize(
-		string $apiKey, string $model, array $highScoreEntries,
+		string $apiKey, string $model, array $summaryEntries,
 		$entryDAO, array &$results
 	): void {
-		foreach ($highScoreEntries as $item) {
+		foreach ($summaryEntries as $item) {
 			$entry = $item['entry'];
-			$content = mb_substr(strip_tags($entry->content()), 0, 2000);
-			$title = $entry->title();
-
-			$prompt = "Summarize this article in one concise sentence that captures the key insight.\n\n"
-				. "Title: {$title}\n\nContent:\n{$content}\n\n"
-				. "Return ONLY the summary sentence, no quotes, no prefix.";
-
-			$summary = $this->callClaude($apiKey, $model, $prompt, 200);
+			$summary = $this->generateSummary($apiKey, $model, $entry);
 			if ($summary) {
-				$entry->_attribute('ai_summary', trim($summary));
+				$entry->_attribute('ai_summary', $summary);
 				$entryDAO->updateEntry($entry->toArray());
 
-				// Add summary to results
 				foreach ($results as &$r) {
 					if ($r['id'] == $item['id']) {
-						$r['summary'] = trim($summary);
+						$r['summary'] = $summary;
 						break;
 					}
 				}
@@ -275,25 +358,86 @@ class AiAssistantExtension extends Minz_Extension {
 			return;
 		}
 
-		$content = mb_substr(strip_tags($entry->content()), 0, 2000);
-		$title = $entry->title();
-
-		$prompt = "Summarize this article in one concise sentence that captures the key insight.\n\n"
-			. "Title: {$title}\n\nContent:\n{$content}\n\n"
-			. "Return ONLY the summary sentence, no quotes, no prefix.";
-
-		$summary = $this->callClaude($apiKey, $model, $prompt, 200);
+		$summary = $this->generateSummary($apiKey, $model, $entry);
 		if ($summary === null) {
 			echo json_encode(['status' => 'error', 'message' => 'Claude API call failed']);
 			return;
 		}
 
-		$summary = trim($summary);
 		$entry->_attribute('ai_summary', $summary);
 		$entryDAO->updateEntry($entry->toArray());
 
 		echo json_encode(['status' => 'ok', 'summary' => $summary]);
 	}
+
+	// ── Detail generation ───────────────────────────────────────────────────
+
+	private function ajaxDetail(): void {
+		$entryId = self::jsonParam('entry_id');
+		if (!$entryId) {
+			echo json_encode(['status' => 'error', 'message' => 'No entry ID']);
+			return;
+		}
+
+		$apiKey = $this->getUserConfigurationValue('api_key');
+		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
+
+		if (!$apiKey) {
+			echo json_encode(['status' => 'error', 'message' => 'No API key configured']);
+			return;
+		}
+
+		$entryDAO = FreshRSS_Factory::createEntryDao();
+		$entry = $entryDAO->searchById($entryId);
+		if (!$entry) {
+			echo json_encode(['status' => 'error', 'message' => 'Entry not found']);
+			return;
+		}
+
+		// Return cached detail if available
+		$cached = $entry->attributes()['ai_detail'] ?? null;
+		if ($cached) {
+			echo json_encode(['status' => 'ok', 'detail' => $cached]);
+			return;
+		}
+
+		$profile = $this->getUserConfigurationValue('interest_profile');
+		$content = mb_substr(strip_tags($entry->content()), 0, 6000);
+		$title = $entry->title();
+		$source = $entry->feed(false) ? $entry->feed(false)->name() : 'Unknown';
+
+		$prompt = "Break down this article for a reader with these interests:\n\n"
+			. "<interest_profile>\n{$profile}\n</interest_profile>\n\n"
+			. "Provide a structured breakdown in 3-6 sections. Each section gets a bold\n"
+			. "subtitle and 1-2 sentences of detail. Spend more time on sections relevant\n"
+			. "to the reader's interests. Don't skip sections, but be brief on less\n"
+			. "relevant parts.\n\n"
+			. "Title: {$title}\nSource: {$source}\n\nContent:\n{$content}\n\n"
+			. "Format: **Section Title** on its own line, then detail paragraph. No\n"
+			. "markdown headers or bullets.";
+
+		$detail = $this->callClaude($apiKey, $model, $prompt, 1500);
+		if ($detail === null) {
+			echo json_encode(['status' => 'error', 'message' => 'Claude API call failed']);
+			return;
+		}
+
+		$detail = trim($detail);
+		$entry->_attribute('ai_detail', $detail);
+		$entryDAO->updateEntry($entry->toArray());
+
+		echo json_encode(['status' => 'ok', 'detail' => $detail]);
+	}
+
+	private function formatDetail(string $detail): string {
+		$escaped = htmlspecialchars($detail);
+		// Convert **Title** to <strong>Title</strong>
+		$formatted = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $escaped);
+		// Convert newlines to <br>
+		return nl2br($formatted);
+	}
+
+	// ── Feedback ─────────────────────────────────────────────────────────────
 
 	private function ajaxFeedback(): void {
 		$entryId = self::jsonParam('entry_id');

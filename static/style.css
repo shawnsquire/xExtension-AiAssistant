@@ -35,7 +35,9 @@
 }
 
 .ai-feedback-btn,
-.ai-summarize-btn {
+.ai-summarize-btn,
+.ai-detail-btn,
+.ai-detail-toggle {
 	background: none;
 	border: 1px solid currentColor;
 	border-radius: 4px;
@@ -50,7 +52,9 @@
 }
 
 .ai-feedback-btn:hover,
-.ai-summarize-btn:hover {
+.ai-summarize-btn:hover,
+.ai-detail-btn:hover,
+.ai-detail-toggle:hover {
 	opacity: 1;
 }
 
@@ -58,6 +62,24 @@
 	opacity: 1;
 	border-color: #22c55e;
 	color: #22c55e;
+}
+
+.ai-detail {
+	width: 100%;
+	padding: 8px 0 4px 12px;
+	font-size: 12px;
+	line-height: 1.5;
+	opacity: 0.85;
+}
+
+.ai-detail strong {
+	display: block;
+	margin-top: 6px;
+	font-size: 12px;
+}
+
+.ai-detail strong:first-child {
+	margin-top: 0;
 }
 
 .ai-scoring-spinner {
