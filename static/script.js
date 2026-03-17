@@ -1,7 +1,7 @@
 "use strict";
 
 (function () {
-	var EXT_NAME = "AiAssistant";
+	var EXT_NAME = "AI Assistant";
 
 	function getAjaxUrl(action) {
 		var url = new URL(window.location.pathname, window.location.origin);

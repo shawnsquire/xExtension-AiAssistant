@@ -83,7 +83,7 @@ document.getElementById('test-api-key').addEventListener('click', function() {
 	var url = new URL(window.location.pathname, window.location.origin);
 	url.searchParams.set('c', 'extension');
 	url.searchParams.set('a', 'configure');
-	url.searchParams.set('e', 'AiAssistant');
+	url.searchParams.set('e', 'AI Assistant');
 	url.searchParams.set('ajax_action', 'test_api_key');
 
 	fetch(url.toString(), {
