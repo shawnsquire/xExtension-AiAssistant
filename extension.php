@@ -24,11 +24,20 @@ class AiAssistantExtension extends Minz_Extension {
 		$attrs = $entry->attributes();
 		$entryId = $entry->id();
 
+		// Inject CSRF meta once (must happen before any early return)
+		$meta = '';
+		if (!self::$metaInjected) {
+			self::$metaInjected = true;
+			$token = FreshRSS_Auth::csrfToken();
+			$meta = '<div id="ai-assistant-meta" data-token="'
+				. htmlspecialchars($token) . '" style="display:none"></div>';
+		}
+
 		// Unscored: emit placeholder for JS batch scoring
 		if (!isset($attrs['ai_score'])) {
 			$placeholder = '<div class="ai-assistant-container ai-score-pending"'
 				. ' data-entry-id="' . htmlspecialchars($entryId) . '"></div>';
-			$entry->_content($placeholder . $entry->content());
+			$entry->_content($meta . $placeholder . $entry->content());
 			return $entry;
 		}
 
@@ -43,15 +52,6 @@ class AiAssistantExtension extends Minz_Extension {
 			$colorClass = 'ai-score-mid';
 		} else {
 			$colorClass = 'ai-score-low';
-		}
-
-		// Inject CSRF meta once
-		$meta = '';
-		if (!self::$metaInjected) {
-			self::$metaInjected = true;
-			$token = FreshRSS_Auth::csrfToken();
-			$meta = '<div id="ai-assistant-meta" data-token="'
-				. htmlspecialchars($token) . '" style="display:none"></div>';
 		}
 
 		// Build badge

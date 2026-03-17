@@ -3,11 +3,12 @@
 (function () {
 	var EXT_NAME = "AiAssistant";
 
-	function getAjaxUrl() {
+	function getAjaxUrl(action) {
 		var url = new URL(window.location.pathname, window.location.origin);
 		url.searchParams.set("c", "extension");
 		url.searchParams.set("a", "configure");
 		url.searchParams.set("e", EXT_NAME);
+		url.searchParams.set("ajax_action", action);
 		return url.toString();
 	}
 
@@ -34,11 +35,10 @@
 			el.innerHTML = '<span class="ai-scoring-spinner">Scoring\u2026</span>';
 		});
 
-		fetch(getAjaxUrl(), {
+		fetch(getAjaxUrl("score_batch"), {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
 			body: new URLSearchParams({
-				ajax_action: "score_batch",
 				entry_ids: JSON.stringify(ids),
 				_csrf: getCsrfToken(),
 			}),
@@ -105,11 +105,10 @@
 		btn.disabled = true;
 		btn.textContent = "Summarizing\u2026";
 
-		fetch(getAjaxUrl(), {
+		fetch(getAjaxUrl("summarize"), {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
 			body: new URLSearchParams({
-				ajax_action: "summarize",
 				entry_id: entryId,
 				_csrf: getCsrfToken(),
 			}),
@@ -148,11 +147,10 @@
 
 		btn.disabled = true;
 
-		fetch(getAjaxUrl(), {
+		fetch(getAjaxUrl("feedback"), {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
 			body: new URLSearchParams({
-				ajax_action: "feedback",
 				entry_id: entryId,
 				direction: direction,
 				reason: reason,
