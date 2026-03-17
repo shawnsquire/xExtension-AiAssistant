@@ -77,6 +77,7 @@ class AiAssistantExtension extends Minz_Extension {
 
 	public function handleConfigureAction(): void {
 		$ajaxAction = Minz_Request::paramString('ajax_action');
+		Minz_Log::warning("AiAssistant: handleConfigureAction reached, ajax_action=" . var_export($ajaxAction, true));
 		if ($ajaxAction) {
 			$this->handleAjax($ajaxAction);
 			return;
