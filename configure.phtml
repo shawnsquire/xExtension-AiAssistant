@@ -56,36 +56,62 @@ $csrfToken = FreshRSS_Auth::csrfToken();
 			</div>
 
 			<div class="form-group">
-				<label>Always Summarize</label>
+				<label>Per-Feed Settings</label>
 				<p class="help-block">
-					Articles from checked feeds/categories will always be summarized, regardless of score.
+					<strong>Score</strong> — checked feeds get AI-scored. Unchecked feeds skip all scoring logic.<br>
+					<strong>Summarize</strong> — checked feeds always get summarized, regardless of score.
 				</p>
-				<?php foreach ($this->categories as $c) { ?>
-					<table class="table table-condensed" style="margin-bottom: 4px;">
+				<table class="table table-condensed" style="margin-bottom: 4px;">
+					<thead>
 						<tr>
-							<td style="width: 30px;">
+							<th style="width: 40px; height: 60px; vertical-align: bottom; position: relative;">
+								<span style="display: inline-block; transform: rotate(-45deg); transform-origin: bottom left; white-space: nowrap; position: absolute; bottom: 6px; left: 20px; font-size: 12px;">Score</span>
+							</th>
+							<th style="width: 40px; height: 60px; vertical-align: bottom; position: relative;">
+								<span style="display: inline-block; transform: rotate(-45deg); transform-origin: bottom left; white-space: nowrap; position: absolute; bottom: 6px; left: 20px; font-size: 12px;">Summarize</span>
+							</th>
+							<th></th>
+						</tr>
+					</thead>
+					<?php foreach ($this->categories as $c) { ?>
+						<tr>
+							<td style="text-align: center;">
+								<input type="checkbox"
+									id="score_cat_<?= $c->id() ?>"
+									name="score_cat_<?= $c->id() ?>"
+									value="1"
+									<?= $this->getScoreCategory($c->id()) ? 'checked' : '' ?>>
+							</td>
+							<td style="text-align: center;">
 								<input type="checkbox"
 									id="sum_cat_<?= $c->id() ?>"
 									name="sum_cat_<?= $c->id() ?>"
 									value="1"
 									<?= $this->getSummarizeCategory($c->id()) ? 'checked' : '' ?>>
 							</td>
-							<td><strong><label for="sum_cat_<?= $c->id() ?>"><?= htmlspecialchars($c->name()) ?> (whole category)</label></strong></td>
+							<td><strong><label for="score_cat_<?= $c->id() ?>"><?= htmlspecialchars($c->name()) ?> (whole category)</label></strong></td>
 						</tr>
 						<?php foreach ($c->feeds() as $f) { ?>
 							<tr>
-								<td style="width: 30px; padding-left: 20px;">
+								<td style="text-align: center; padding-left: 10px;">
+									<input type="checkbox"
+										id="score_feed_<?= $f->id() ?>"
+										name="score_feed_<?= $f->id() ?>"
+										value="1"
+										<?= $this->getScoreFeed($f->id()) ? 'checked' : '' ?>>
+								</td>
+								<td style="text-align: center; padding-left: 10px;">
 									<input type="checkbox"
 										id="sum_feed_<?= $f->id() ?>"
 										name="sum_feed_<?= $f->id() ?>"
 										value="1"
 										<?= $this->getSummarizeFeed($f->id()) ? 'checked' : '' ?>>
 								</td>
-								<td><label for="sum_feed_<?= $f->id() ?>"><?= htmlspecialchars($f->name()) ?></label></td>
+								<td style="padding-left: 20px;"><label for="score_feed_<?= $f->id() ?>"><?= htmlspecialchars($f->name()) ?></label></td>
 							</tr>
 						<?php } ?>
-					</table>
-				<?php } ?>
+					<?php } ?>
+				</table>
 			</div>
 
 			<div class="form-group">

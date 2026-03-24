@@ -23,7 +23,9 @@ class AiAssistantExtension extends Minz_Extension {
 	// ── Hooks ────────────────────────────────────────────────────────────────
 
 	public function hookEntryBeforeInsert(FreshRSS_Entry $entry): FreshRSS_Entry {
-		$entry->_attribute('ai_needs_scoring', true);
+		if ($this->shouldScore($entry)) {
+			$entry->_attribute('ai_needs_scoring', true);
+		}
 		return $entry;
 	}
 
@@ -94,9 +96,11 @@ class AiAssistantExtension extends Minz_Extension {
 		$catDAO = FreshRSS_Factory::createCategoryDao();
 		$this->categories = $catDAO->listCategories(true, false) ?: [];
 
-		// Load current always-summarize config
+		// Load current per-feed/category config
 		$this->summarizeFeeds = $this->loadAttribute('ext_ai_assistant_summarize_feeds');
 		$this->summarizeCategories = $this->loadAttribute('ext_ai_assistant_summarize_categories');
+		$this->scoreFeeds = $this->loadAttribute('ext_ai_assistant_score_feeds');
+		$this->scoreCategories = $this->loadAttribute('ext_ai_assistant_score_categories');
 
 		// Normal POST: save settings
 		if (Minz_Request::isPost()) {
@@ -108,26 +112,38 @@ class AiAssistantExtension extends Minz_Extension {
 			$config['summary_model'] = Minz_Request::paramString('summary_model');
 			$this->setUserConfiguration($config);
 
-			// Save per-feed/category always-summarize checkboxes
-			$feedConfig = [];
-			$catConfig = [];
+			// Save per-feed/category checkboxes (score + summarize)
+			$sumFeedConfig = [];
+			$sumCatConfig = [];
+			$scoreFeedConfig = [];
+			$scoreCatConfig = [];
 			foreach ($this->categories as $c) {
 				if (Minz_Request::paramBoolean('sum_cat_' . $c->id())) {
-					$catConfig[$c->id()] = true;
+					$sumCatConfig[$c->id()] = true;
+				}
+				if (Minz_Request::paramBoolean('score_cat_' . $c->id())) {
+					$scoreCatConfig[$c->id()] = true;
 				}
 				foreach ($c->feeds() as $f) {
 					if (Minz_Request::paramBoolean('sum_feed_' . $f->id())) {
-						$feedConfig[$f->id()] = true;
+						$sumFeedConfig[$f->id()] = true;
+					}
+					if (Minz_Request::paramBoolean('score_feed_' . $f->id())) {
+						$scoreFeedConfig[$f->id()] = true;
 					}
 				}
 			}
-			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_feeds', json_encode($feedConfig));
-			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_categories', json_encode($catConfig));
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_feeds', json_encode($sumFeedConfig));
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_summarize_categories', json_encode($sumCatConfig));
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_score_feeds', json_encode($scoreFeedConfig));
+			FreshRSS_Context::userConf()->_attribute('ext_ai_assistant_score_categories', json_encode($scoreCatConfig));
 			FreshRSS_Context::userConf()->save();
 
 			// Reload for display
-			$this->summarizeFeeds = $feedConfig;
-			$this->summarizeCategories = $catConfig;
+			$this->summarizeFeeds = $sumFeedConfig;
+			$this->summarizeCategories = $sumCatConfig;
+			$this->scoreFeeds = $scoreFeedConfig;
+			$this->scoreCategories = $scoreCatConfig;
 		}
 	}
 
@@ -135,6 +151,8 @@ class AiAssistantExtension extends Minz_Extension {
 	public array $categories = [];
 	public array $summarizeFeeds = [];
 	public array $summarizeCategories = [];
+	public array $scoreFeeds = [];
+	public array $scoreCategories = [];
 
 	public function getSummarizeFeed(int $id): bool {
 		return isset($this->summarizeFeeds[$id]);
@@ -144,11 +162,30 @@ class AiAssistantExtension extends Minz_Extension {
 		return isset($this->summarizeCategories[$id]);
 	}
 
+	public function getScoreFeed(int $id): bool {
+		return isset($this->scoreFeeds[$id]);
+	}
+
+	public function getScoreCategory(int $id): bool {
+		return isset($this->scoreCategories[$id]);
+	}
+
 	private function loadAttribute(string $key): array {
 		$value = FreshRSS_Context::userConf()->attributeString($key);
 		if ($value === '') return [];
 		$decoded = json_decode($value, true);
 		return is_array($decoded) ? $decoded : [];
+	}
+
+	private function shouldScore(FreshRSS_Entry $entry): bool {
+		$feedId = $entry->feedId();
+		$feed = $entry->feed(false);
+		$catId = $feed ? ($feed->category() ? $feed->category()->id() : null) : null;
+
+		$feedConfig = $this->loadAttribute('ext_ai_assistant_score_feeds');
+		$catConfig = $this->loadAttribute('ext_ai_assistant_score_categories');
+
+		return isset($feedConfig[$feedId]) || ($catId !== null && isset($catConfig[$catId]));
 	}
 
 	private function isAlwaysSummarize(FreshRSS_Entry $entry): bool {
