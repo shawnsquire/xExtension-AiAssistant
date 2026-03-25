@@ -33,10 +33,14 @@ class AiAssistantExtension extends Minz_Extension {
 		$attrs = $entry->attributes();
 		$entryId = $entry->id();
 
-		// Unscored: emit placeholder for JS batch scoring
+		// Unscored: emit placeholder for JS batch scoring, but still show action buttons
 		if (!isset($attrs['ai_score'])) {
 			$placeholder = '<div class="ai-assistant-container ai-score-pending"'
-				. ' data-entry-id="' . htmlspecialchars($entryId) . '"></div>';
+				. ' data-entry-id="' . htmlspecialchars($entryId) . '">'
+				. '<span class="ai-scoring-status"></span>'
+				. '<button class="ai-summarize-btn">Summarize</button>'
+				. '<button class="ai-chat-btn">Chat</button>'
+				. '</div>';
 			$entry->_content($placeholder . $entry->content());
 			return $entry;
 		}

@@ -20,7 +20,9 @@
 			method: "POST",
 			headers: { "Content-Type": "application/json; charset=UTF-8" },
 			body: JSON.stringify(params),
-		}).then(function (r) { return r.json(); });
+		}).then(function (r) {
+			return r.json();
+		});
 	}
 
 	// ── Chunked batch scoring ───────────────────────────────────────────────
@@ -40,9 +42,15 @@
 		});
 		if (!ids.length) return;
 
-		// Show loading state on all
+		// Show loading state on all (preserve action buttons)
 		pending.forEach(function (el) {
-			el.innerHTML = '<span class="ai-scoring-spinner">Scoring\u2026</span>';
+			var statusEl = el.querySelector(".ai-scoring-status");
+			if (statusEl) {
+				statusEl.className = "ai-scoring-spinner";
+				statusEl.textContent = "Scoring\u2026";
+			} else {
+				el.innerHTML = '<span class="ai-scoring-spinner">Scoring\u2026</span>';
+			}
 		});
 
 		// 1 entry → score immediately; multiple → chunk into groups of CHUNK_SIZE
@@ -62,8 +70,11 @@
 						console.error("AI scoring failed:", data.message);
 						chunk.forEach(function (id) {
 							if (elMap[id]) {
-								elMap[id].innerHTML = '<span class="ai-score-error">Score failed</span>'
-									+ ' <button class="ai-retry-score-btn">Retry</button>';
+								elMap[id].innerHTML =
+									'<span class="ai-score-error">Score failed</span>' +
+									' <button class="ai-retry-score-btn">Retry</button>' +
+									' <button class="ai-summarize-btn">Summarize</button>' +
+									' <button class="ai-chat-btn">Chat</button>';
 							}
 						});
 					} else {
@@ -79,8 +90,11 @@
 					console.error("AI scoring request failed:", err);
 					chunk.forEach(function (id) {
 						if (elMap[id]) {
-							elMap[id].innerHTML = '<span class="ai-score-error">Score failed</span>'
-								+ ' <button class="ai-retry-score-btn">Retry</button>';
+							elMap[id].innerHTML =
+								'<span class="ai-score-error">Score failed</span>' +
+								' <button class="ai-retry-score-btn">Retry</button>' +
+								' <button class="ai-summarize-btn">Summarize</button>' +
+								' <button class="ai-chat-btn">Chat</button>';
 						}
 					});
 					processChunk(index + 1);
@@ -91,31 +105,43 @@
 	}
 
 	function renderScore(el, s) {
-		var colorClass = s.score >= 7 ? "ai-score-high"
-			: s.score >= 4 ? "ai-score-mid" : "ai-score-low";
+		var colorClass =
+			s.score >= 7
+				? "ai-score-high"
+				: s.score >= 4
+					? "ai-score-mid"
+					: "ai-score-low";
 
-		var html = '<span class="ai-score-badge ' + colorClass
-			+ '" title="' + (s.reason || "").replace(/"/g, "&quot;") + '">'
-			+ s.score + "</span>";
+		var html =
+			'<span class="ai-score-badge ' +
+			colorClass +
+			'" title="' +
+			(s.reason || "").replace(/"/g, "&quot;") +
+			'">' +
+			s.score +
+			"</span>";
 
 		if (s.summary) {
-			html += '<span class="ai-summary">'
-				+ escapeHtml(s.summary) + "</span>";
+			html += '<span class="ai-summary">' + escapeHtml(s.summary) + "</span>";
 			html += '<button class="ai-detail-btn">More detail</button>';
 		} else {
 			html += '<button class="ai-summarize-btn">Summarize</button>';
 		}
 
-		html += '<button class="ai-chat-btn">Chat</button>'
-			+ '<button class="ai-feedback-btn" data-dir="more" title="More like this">+</button>'
-			+ '<button class="ai-feedback-btn" data-dir="less" title="Less like this">&minus;</button>';
+		html +=
+			'<button class="ai-chat-btn">Chat</button>' +
+			'<button class="ai-feedback-btn" data-dir="more" title="More like this">+</button>' +
+			'<button class="ai-feedback-btn" data-dir="less" title="Less like this">&minus;</button>';
 
 		el.innerHTML = html;
 		el.classList.remove("ai-score-pending");
 	}
 
 	function escapeHtml(str) {
-		return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		return str
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
 			.replace(/"/g, "&quot;");
 	}
 
@@ -200,7 +226,10 @@
 
 	function formatDetail(text) {
 		// Escape HTML
-		var escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+		var escaped = text
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;");
 		// Convert **Title** to <strong>Title</strong>
 		escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 		// Convert newlines to <br>
@@ -217,13 +246,17 @@
 		var reason = prompt(
 			direction === "more"
 				? "Why should articles like this score higher?"
-				: "Why should articles like this score lower?"
+				: "Why should articles like this score lower?",
 		);
 		if (reason === null) return;
 
 		btn.disabled = true;
 
-		ajaxPost("feedback", { entry_id: entryId, direction: direction, reason: reason })
+		ajaxPost("feedback", {
+			entry_id: entryId,
+			direction: direction,
+			reason: reason,
+		})
 			.then(function (data) {
 				if (data.status === "ok") {
 					btn.textContent = "\u2713";
@@ -247,7 +280,9 @@
 
 		// Find article title from the entry
 		var article = container.closest(".flux, .item, article, [id^='flux_']");
-		var titleEl = article ? article.querySelector(".title, .item-title, h2 a, h1 a, a.title") : null;
+		var titleEl = article
+			? article.querySelector(".title, .item-title, h2 a, h1 a, a.title")
+			: null;
 		var title = titleEl ? titleEl.textContent.trim() : "Article";
 
 		// Gather existing context from DOM
@@ -255,10 +290,16 @@
 		var detailEl = container.querySelector(".ai-detail");
 		var initialMessages = [];
 		if (summaryEl) {
-			initialMessages.push({ role: "assistant", content: "Summary: " + summaryEl.textContent });
+			initialMessages.push({
+				role: "assistant",
+				content: "Summary: " + summaryEl.textContent,
+			});
 		}
 		if (detailEl) {
-			initialMessages.push({ role: "assistant", content: detailEl.textContent });
+			initialMessages.push({
+				role: "assistant",
+				content: detailEl.textContent,
+			});
 		}
 
 		openChatModal(entryId, title, initialMessages);
@@ -270,23 +311,25 @@
 		chatOverlay = document.createElement("div");
 		chatOverlay.className = "ai-chat-overlay";
 		chatOverlay.innerHTML =
-			'<div class="ai-chat-modal">'
-			+ '<div class="ai-chat-header">'
-			+ '<span class="ai-chat-title">' + escapeHtml(title) + '</span>'
-			+ '<div class="ai-chat-header-controls">'
-			+ '<select class="ai-chat-model">'
-			+ '<option value="claude-sonnet-4-6">Sonnet 4.6</option>'
-			+ '<option value="claude-haiku-4-5-20251001">Haiku 4.5</option>'
-			+ '</select>'
-			+ '<button class="ai-chat-close">&times;</button>'
-			+ '</div>'
-			+ '</div>'
-			+ '<div class="ai-chat-messages"></div>'
-			+ '<div class="ai-chat-input-bar">'
-			+ '<input type="text" class="ai-chat-input" placeholder="Ask about this article\u2026">'
-			+ '<button class="ai-chat-send">Send</button>'
-			+ '</div>'
-			+ '</div>';
+			'<div class="ai-chat-modal">' +
+			'<div class="ai-chat-header">' +
+			'<span class="ai-chat-title">' +
+			escapeHtml(title) +
+			"</span>" +
+			'<div class="ai-chat-header-controls">' +
+			'<select class="ai-chat-model">' +
+			'<option value="claude-sonnet-4-6">Sonnet 4.6</option>' +
+			'<option value="claude-haiku-4-5-20251001">Haiku 4.5</option>' +
+			"</select>" +
+			'<button class="ai-chat-close">&times;</button>' +
+			"</div>" +
+			"</div>" +
+			'<div class="ai-chat-messages"></div>' +
+			'<div class="ai-chat-input-bar">' +
+			'<input type="text" class="ai-chat-input" placeholder="Ask about this article\u2026">' +
+			'<button class="ai-chat-send">Send</button>' +
+			"</div>" +
+			"</div>";
 
 		document.body.appendChild(chatOverlay);
 
@@ -322,7 +365,11 @@
 					if (data.status === "ok" && data.response) {
 						appendMessage(messagesDiv, "assistant", data.response);
 					} else {
-						appendMessage(messagesDiv, "assistant", "Error: " + (data.message || "Request failed"));
+						appendMessage(
+							messagesDiv,
+							"assistant",
+							"Error: " + (data.message || "Request failed"),
+						);
 					}
 					sendBtn.disabled = false;
 					input.focus();
