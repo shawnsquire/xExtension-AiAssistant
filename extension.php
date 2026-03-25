@@ -346,8 +346,9 @@ class AiAssistantExtension extends Minz_Extension {
 
 		$prompt = "You are a research assistant for a reader with these interests:\n\n"
 			. "<interest_profile>\n{$profile}\n</interest_profile>\n\n"
-			. "Summarize this article — what it says and why it matters to this reader.\n"
-			. "Be direct. 1-3 sentences. If it's tangential to their interests, say so.\n\n"
+			. "Summarize this article — what it covers and what parts connect to the reader's interests.\n"
+			. "Focus on what the reader might find useful or interesting. Don't judge whether the article is worth reading.\n"
+			. "Be direct. 1-3 sentences.\n\n"
 			. "Title: {$title}\nSource: {$source}\n\nContent:\n{$content}\n\n"
 			. "Return ONLY the summary, no quotes, no prefix.";
 
