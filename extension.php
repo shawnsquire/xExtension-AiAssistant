@@ -295,7 +295,7 @@ class AiAssistantExtension extends Minz_Extension {
 		// Write scores to entry attributes
 		$results = [];
 		$threshold = intval($this->getUserConfigurationValue('summary_threshold') ?: 5);
-		$summaryModel = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
+		$summaryModel = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6';
 		$summaryEntries = [];
 
 		foreach ($scores as $s) {
@@ -381,7 +381,7 @@ class AiAssistantExtension extends Minz_Extension {
 		}
 
 		$apiKey = $this->getUserConfigurationValue('api_key');
-		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
+		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6';
 
 		if (!$apiKey) {
 			echo json_encode(['status' => 'error', 'message' => 'No API key configured']);
@@ -417,7 +417,7 @@ class AiAssistantExtension extends Minz_Extension {
 		}
 
 		$apiKey = $this->getUserConfigurationValue('api_key');
-		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
+		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6';
 
 		if (!$apiKey) {
 			echo json_encode(['status' => 'error', 'message' => 'No API key configured']);
@@ -487,7 +487,7 @@ class AiAssistantExtension extends Minz_Extension {
 		}
 
 		$apiKey = $this->getUserConfigurationValue('api_key');
-		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6-20250725';
+		$model = $this->getUserConfigurationValue('summary_model') ?: 'claude-sonnet-4-6';
 		$profile = $this->getUserConfigurationValue('interest_profile');
 
 		if (!$apiKey || !$profile) {
