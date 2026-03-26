@@ -74,7 +74,7 @@ class AiAssistantExtension extends Minz_Extension {
 			} else {
 				$html .= '<button class="ai-detail-btn">More detail</button>';
 			}
-		} elseif ($score < $threshold) {
+		} else {
 			$html .= '<button class="ai-summarize-btn">Summarize</button>';
 		}
 
